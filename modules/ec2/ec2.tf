@@ -13,6 +13,16 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
+# Read cloud-init file and replace variables
+locals {
+  cloud_init_content = templatefile("${path.module}/cloud-init-files/wordpress.yaml", {
+    db_name     = "mydb"
+    db_username = var.db_username
+    db_password = var.db_password
+    db_endpoint = var.rds_endpoint
+  })
+}
+
 resource "aws_instance" "web" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.micro"
@@ -21,36 +31,8 @@ resource "aws_instance" "web" {
   iam_instance_profile   = var.iam_instance_profile
   associate_public_ip_address = true
 
-  user_data = base64encode(<<-EOF
-              #!/bin/bash
-              set -e
-              yum update -y
-              yum install -y httpd php php-mysqlnd php-pdo php-gd php-mbstring php-xml wget unzip
-              
-              systemctl start httpd
-              systemctl enable httpd
-              
-              mkdir -p /var/www/html
-              
-              cd /tmp
-              wget https://wordpress.org/latest.zip
-              unzip -o latest.zip
-              rm -rf /var/www/html/*
-              cp -r wordpress/* /var/www/html/
-              rm -f /var/www/html/index.html
-              chown -R apache:apache /var/www/html
-              chmod -R 755 /var/www/html
-              
-              cd /var/www/html
-              cp wp-config-sample.php wp-config.php
-              sed -i "s/database_name_here/mydb/g" wp-config.php
-              sed -i "s/username_here/${var.db_username}/g" wp-config.php
-              sed -i "s/password_here/${var.db_password}/g" wp-config.php
-              sed -i "s/localhost/${var.rds_endpoint}/g" wp-config.php
-              
-              systemctl restart httpd
-              EOF
-  )
+  # Use cloud-init YAML file
+  user_data = base64encode(local.cloud_init_content)
 
   tags = {
     Name = "wordpress-web-server"

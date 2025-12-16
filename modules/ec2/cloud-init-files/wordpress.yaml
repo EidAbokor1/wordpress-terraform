@@ -1,0 +1,53 @@
+#cloud-config
+# WordPress Cloud-Init Configuration
+
+# Update system packages
+package_update: true
+package_upgrade: true
+
+# Install required packages
+packages:
+  - httpd
+  - php
+  - php-mysqlnd
+  - php-pdo
+  - php-gd
+  - php-mbstring
+  - php-xml
+  - wget
+  - unzip
+
+# Run commands after packages are installed
+runcmd:
+  # Start Apache
+  - systemctl start httpd
+  - systemctl enable httpd
+  
+  # Create WordPress directory
+  - mkdir -p /var/www/html
+  
+  # Download and install WordPress
+  - cd /tmp
+  - wget https://wordpress.org/latest.zip
+  - unzip -o latest.zip
+  - rm -rf /var/www/html/*
+  - cp -r wordpress/* /var/www/html/
+  - rm -f /var/www/html/index.html
+  
+  # Set permissions
+  - chown -R apache:apache /var/www/html
+  - chmod -R 755 /var/www/html
+  
+  # Configure WordPress
+  - cd /var/www/html
+  - cp wp-config-sample.php wp-config.php
+  - sed -i "s/database_name_here/mydb/g" wp-config.php
+  - sed -i "s/username_here/${db_username}/g" wp-config.php
+  - sed -i "s/password_here/${db_password}/g" wp-config.php
+  - sed -i "s/localhost/${db_endpoint}/g" wp-config.php
+  
+  # Restart Apache
+  - systemctl restart httpd
+
+# Output final message
+final_message: "WordPress installation completed at $TIMESTAMP"
